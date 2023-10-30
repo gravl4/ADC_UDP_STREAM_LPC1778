@@ -1,0 +1,15 @@
+../example/src/board.c:114:13:Board_LED_Init	0	static
+../example/src/board.c:46:6:Board_UART_Init	0	static
+../example/src/board.c:65:6:Board_Debug_Init	8	static
+../example/src/board.c:80:6:Board_UARTPutChar	0	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/WEB_bare_loader/example/inc/retarget.h:223:5:__write	16	static
+../example/src/board.c:89:5:Board_UARTGetChar	0	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/WEB_bare_loader/example/inc/retarget.h:239:5:__readc	8	static
+../example/src/board.c:100:6:Board_UARTPutSTR	8	static
+../example/src/board.c:126:6:Board_LED_Set	0	static
+../example/src/board.c:135:6:Board_LED_Test	0	static
+../example/src/board.c:148:6:Board_LED_Toggle	0	static
+../example/src/board.c:156:6:Board_ENET_GetMacADDR	16	static
+../example/src/board.c:165:6:Board_Init	8	static
+../example/src/board.c:179:6:Board_Buttons_Init	0	static
+../example/src/board.c:184:10:Buttons_GetStatus	0	static

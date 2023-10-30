@@ -1,0 +1,13 @@
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_board_ea_devkit_1788/inc/board.h:313:20:Board_NorFlash_WriteCmd	16	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_board_ea_devkit_1788/inc/board.h:323:24:Board_NorFlash_ReadCmdData	16	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_board_ea_devkit_1788/inc/board.h:334:20:Board_NorFlash_WriteWord	16	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_board_ea_devkit_1788/inc/board.h:344:24:Board_NorFlash_ReadWord	16	static
+../src/lpc_norflash_sst39vf320.c:65:6:lpc_norflash_init	4	static
+../src/lpc_norflash_sst39vf320.c:69:6:lpc_norflash_get_size	16	static
+../src/lpc_norflash_sst39vf320.c:76:8:lpc_norflash_get_sector_offset	16	static
+../src/lpc_norflash_sst39vf320.c:81:6:lpc_norflash_get_id	24	static
+../src/lpc_norflash_sst39vf320.c:110:6:lpc_norflash_toggle_bit_check	24	static
+../src/lpc_norflash_sst39vf320.c:122:6:lpc_norflash_erase_sector	16	static
+../src/lpc_norflash_sst39vf320.c:133:6:lpc_norflash_write_word	16	static
+../src/lpc_norflash_sst39vf320.c:142:8:lpc_norflash_write_buffer	32	static
+../src/lpc_norflash_sst39vf320.c:154:8:lpc_norflash_read_word	16	static

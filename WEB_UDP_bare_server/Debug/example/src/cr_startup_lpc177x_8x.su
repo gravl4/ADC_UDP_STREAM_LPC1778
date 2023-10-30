@@ -1,0 +1,13 @@
+../example/src/cr_startup_lpc177x_8x.c:243:6:data_init	40	static
+../example/src/cr_startup_lpc177x_8x.c:252:6:bss_init	24	static
+../example/src/cr_startup_lpc177x_8x.c:278:1:ResetISR	24	static
+../example/src/cr_startup_lpc177x_8x.c:335:6:NMI_Handler	4	static
+../example/src/cr_startup_lpc177x_8x.c:340:6:HardFault_Handler	4	static
+../example/src/cr_startup_lpc177x_8x.c:345:6:MemManage_Handler	4	static
+../example/src/cr_startup_lpc177x_8x.c:350:6:BusFault_Handler	4	static
+../example/src/cr_startup_lpc177x_8x.c:355:6:UsageFault_Handler	4	static
+../example/src/cr_startup_lpc177x_8x.c:360:6:SVC_Handler	4	static
+../example/src/cr_startup_lpc177x_8x.c:365:6:DebugMon_Handler	4	static
+../example/src/cr_startup_lpc177x_8x.c:370:6:PendSV_Handler	4	static
+../example/src/cr_startup_lpc177x_8x.c:375:6:SysTick_Handler	4	static
+../example/src/cr_startup_lpc177x_8x.c:386:6:IntDefaultHandler	4	static

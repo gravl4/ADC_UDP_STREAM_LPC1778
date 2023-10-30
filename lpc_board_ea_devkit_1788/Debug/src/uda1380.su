@@ -1,0 +1,7 @@
+../src/uda1380.c:75:12:Audio_Codec_SetDefaultValues	32	static
+../src/uda1380.c:92:6:UDA1380_REG_Write	24	static
+../src/uda1380.c:100:10:UDA1380_REG_Read	32	static
+../src/uda1380.c:109:5:UDA1380_REG_WriteVerify	24	static
+../src/uda1380.c:118:5:UDA1380_REG_VerifyMult	40	static
+../src/uda1380.c:136:5:UDA1380_Init	24	static
+../src/uda1380.c:174:5:UDA1380_REG_WriteMult	16	static

@@ -1,0 +1,5 @@
+post_example.c:95:7:httpd_post_begin	24	static
+post_example.c:125:7:httpd_post_receive_data	24	static
+post_example.c:158:6:httpd_post_finished	24	static
+post_example.c:190:20:fwupdate_state_str	16	static
+post_example.c:207:12:fwupdate_multipart_state_machine	48	static

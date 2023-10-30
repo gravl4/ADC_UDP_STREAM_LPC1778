@@ -1,0 +1,5 @@
+../src/lcd_17xx_40xx.c:55:6:Chip_LCD_Init	32	static
+../src/lcd_17xx_40xx.c:136:6:Chip_LCD_DeInit	16	static
+../src/lcd_17xx_40xx.c:142:6:Chip_LCD_Cursor_Config	16	static
+../src/lcd_17xx_40xx.c:149:6:Chip_LCD_Cursor_WriteImage	40	static
+../src/lcd_17xx_40xx.c:175:6:Chip_LCD_LoadPalette	32	static

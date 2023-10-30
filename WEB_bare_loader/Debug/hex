@@ -1,0 +1,3 @@
+/usr/local/mcuxpressoide-11.6.0_8187/ide/tools/bin/arm-none-eabi-objcopy -O ihex WEB_bare_loader.axf WEB_bare_loader.hex
+
+http://support.code-red-tech.com/CodeRedWiki/OutputFormats

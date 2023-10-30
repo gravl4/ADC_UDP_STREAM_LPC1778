@@ -1,0 +1,13 @@
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_board_ea_devkit_1788/inc/board.h:387:20:Board_NANDFLash_WriteCmd	16	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_board_ea_devkit_1788/inc/board.h:397:20:Board_NANDFLash_WriteAddr	16	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_board_ea_devkit_1788/inc/board.h:407:20:Board_NANDFLash_WriteByte	16	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_board_ea_devkit_1788/inc/board.h:416:23:Board_NANDFLash_ReadByte	4	static
+../src/lpc_nandflash_k9f1g.c:64:6:lpc_nandflash_init	4	static
+../src/lpc_nandflash_k9f1g.c:68:6:lpc_nandflash_DeInit	4	static
+../src/lpc_nandflash_k9f1g.c:72:29:lpc_nandflash_get_size	4	static
+../src/lpc_nandflash_k9f1g.c:78:6:lpc_nandflash_get_id	24	static
+../src/lpc_nandflash_k9f1g.c:98:9:lpc_nandflash_read_status	16	static
+../src/lpc_nandflash_k9f1g.c:115:6:lpc_nandflash_erase_block	24	static
+../src/lpc_nandflash_k9f1g.c:135:10:lpc_nandflash_write_page	32	static
+../src/lpc_nandflash_k9f1g.c:165:6:lpc_nandflash_read_start	32	static
+../src/lpc_nandflash_k9f1g.c:187:6:lpc_nandflash_read_data	24	static

@@ -1,0 +1,14 @@
+../src/sdc_17xx_40xx.c:40:13:writeDelay	16	static
+../src/sdc_17xx_40xx.c:60:6:Chip_SDC_PowerControl	24	static
+../src/sdc_17xx_40xx.c:67:6:Chip_SDC_SetClockDiv	24	static
+../src/sdc_17xx_40xx.c:76:6:Chip_SDC_ClockControl	16	static
+../src/sdc_17xx_40xx.c:89:13:SDC_Init	16	static
+../src/sdc_17xx_40xx.c:115:6:Chip_SDC_Init	24	static
+../src/sdc_17xx_40xx.c:142:6:Chip_SDC_SetCommand	24	static
+../src/sdc_17xx_40xx.c:157:6:Chip_SDC_ResetCommand	16	static
+../src/sdc_17xx_40xx.c:169:6:Chip_SDC_GetResp	24	static
+../src/sdc_17xx_40xx.c:179:6:Chip_SDC_SetDataTransfer	24	static
+../src/sdc_17xx_40xx.c:195:6:Chip_SDC_WriteFIFO	32	static
+../src/sdc_17xx_40xx.c:209:6:Chip_SDC_ReadFIFO	32	static
+../src/sdc_17xx_40xx.c:224:6:Chip_SDC_SetClock	24	static
+../src/sdc_17xx_40xx.c:239:6:Chip_SDC_DeInit	16	static

@@ -1,0 +1,6 @@
+../lwip/src/arch/lpc17xx_40xx_systick_arch.c:69:6:SysTick_Enable	0	static
+../lwip/src/arch/lpc17xx_40xx_systick_arch.c:87:6:SysTick_Disable	0	static
+../lwip/src/arch/lpc17xx_40xx_systick_arch.c:104:6:SysTick_Handler	0	static
+../lwip/src/arch/lpc17xx_40xx_systick_arch.c:115:10:SysTick_GetMS	0	static
+../lwip/src/arch/lpc17xx_40xx_systick_arch.c:121:6:msDelay	0	static
+../lwip/src/arch/lpc17xx_40xx_systick_arch.c:133:7:sys_now	8	static

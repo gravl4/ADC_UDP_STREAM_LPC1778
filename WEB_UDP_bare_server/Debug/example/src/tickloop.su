@@ -1,0 +1,2 @@
+../example/src/tickloop.c:11:9:check_halfloop	16	static
+../example/src/tickloop.c:34:9:get_cmploop	24	static

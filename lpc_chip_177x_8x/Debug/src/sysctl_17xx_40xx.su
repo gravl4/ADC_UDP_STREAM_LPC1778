@@ -1,0 +1,2 @@
+../src/sysctl_17xx_40xx.c:46:10:Chip_SYSCTL_GetClrSleepFlags	24	static
+../src/sysctl_17xx_40xx.c:57:6:Chip_SYSCTL_PeriphReset	24	static

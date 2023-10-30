@@ -1,0 +1,10 @@
+../example/src/main.c:140:13:prvSetupHardware	8	static
+../example/src/main.c:207:6:write_data	16	static
+../example/src/main.c:219:6:erase_sector	8	static
+../example/src/main.c:227:6:prepare_sector	8	static
+../example/src/main.c:190:6:find_erase_prepare_sector	16	static
+../example/src/main.c:157:10:write_flash	8	static
+../example/src/main.c:235:6:compare_mem	8	static
+../example/src/main.c:270:5:user_code_present	8	static
+../example/src/main.c:288:6:jump_to_app_section	0	static
+../example/src/main.c:340:5:main	56	static

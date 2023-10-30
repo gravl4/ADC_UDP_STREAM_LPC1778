@@ -1,0 +1,17 @@
+http_client.c:157:1:httpc_free_state	24	static
+http_client.c:192:1:httpc_close	40	static
+http_client.c:207:1:http_parse_response_status	56	static
+http_client.c:248:1:http_wait_headers	56	static
+http_client.c:280:1:httpc_tcp_recv	64	static
+http_client.c:355:1:httpc_tcp_err	24	static
+http_client.c:367:1:httpc_tcp_poll	24	static
+http_client.c:385:1:httpc_tcp_sent	24	static
+http_client.c:396:1:httpc_tcp_connected	32	static
+http_client.c:419:1:httpc_get_internal_addr	24	static
+http_client.c:468:1:httpc_get_internal_dns	24	static
+http_client.c:489:1:httpc_create_request_string	40	static
+http_client.c:509:1:httpc_init_connection_common	64	static
+http_client.c:596:1:httpc_init_connection	40	static
+http_client.c:607:1:httpc_init_connection_addr	48	static
+http_client.c:634:1:httpc_get_file	48	static
+http_client.c:679:1:httpc_get_file_dns	48	static

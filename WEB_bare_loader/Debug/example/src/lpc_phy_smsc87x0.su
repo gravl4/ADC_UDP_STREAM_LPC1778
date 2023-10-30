@@ -1,0 +1,5 @@
+../example/src/lpc_phy_smsc87x0.c:144:13:smsc_update_phy_sts	0	static
+../example/src/lpc_phy_smsc87x0.c:119:15:lpc_mii_read	16	static
+../example/src/lpc_phy_smsc87x0.c:94:15:lpc_mii_write	8	static
+../example/src/lpc_phy_smsc87x0.c:186:10:lpc_phy_init	16	static
+../example/src/lpc_phy_smsc87x0.c:230:10:lpcPHYStsPoll	8	static

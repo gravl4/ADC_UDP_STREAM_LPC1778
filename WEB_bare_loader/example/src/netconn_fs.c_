@@ -1,0 +1,877 @@
+/*
+* @brief	Netconn implementation that gets data from filesystem
+*
+* @note
+* Copyright(C) NXP Semiconductors, 2012
+* All rights reserved.
+*
+* @par
+* Software that is described herein is for illustrative purposes only
+* which provides customers with programming information regarding the
+* LPC products.  This software is supplied "AS IS" without any warranties of
+* any kind, and NXP Semiconductors and its licensor disclaim any and
+* all warranties, express or implied, including all implied warranties of
+* merchantability, fitness for a particular purpose and non-infringement of
+* intellectual property rights.  NXP Semiconductors assumes no responsibility
+* or liability for the use of the software, conveys no license or rights under any
+* patent, copyright, mask work right, or any other intellectual property rights in
+* or to any products. NXP Semiconductors reserves the right to make changes
+* in the software without notification. NXP Semiconductors also makes no
+* representation or warranty that such application will be suitable for the
+* specified use without further testing or modification.
+*
+* @par
+* Permission to use, copy, modify, and distribute this software and its
+* documentation is hereby granted, under NXP Semiconductors' and its
+* licensor's relevant copyrights in the software, without fee, provided that it
+* is used in conjunction with NXP Semiconductors microcontrollers.  This
+* copyright, permission, and disclaimer notice must appear in all copies of
+* this code.
+*/
+
+#include <stdio.h>
+#include <string.h>
+#include "lwip/opt.h"
+#include "lwip/arch.h"
+#include "lwip/api.h"
+#include "lwip_fs.h"
+
+#include "1778_var.h"
+
+#if LWIP_NETCONN
+
+#ifndef HTTPD_DEBUG
+#define HTTPD_DEBUG         LWIP_DBG_OFF
+#endif
+
+extern char v1778_log;
+extern  char v1778_data;
+extern  u16_t v1778_len;
+extern uint32_t v1778_x;
+
+/* Default file content incase a valid filesystem is not present */
+const static char http_html_hdr[] = "HTTP/1.1 200 OK\r\nContent-type: text/html\r\n\r\n";
+//const static char http_index_html[] = "<html><head><title>Congrats!</title></head><body><h1>Welcome to our lwIP HTTP server!</h1><p>This is a small test page, served by httpserver-netconn.</body></html>";
+
+//	"<meta http-equiv=""Refresh"" content=""5"" />"
+/*const static char http_index_html_1[] =
+	"<html><head><title>Congrats!</title></head>"
+	"<body><h1>1778 LOG PAGE</h1>"
+	"<p>This is a small test page, served by httpd of lwip.</p>"
+	"<p>: </p>";
+*/
+const static char http_index_html_1[] = "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
+		"<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
+		    "<input type='file' name='update'>"
+		    "<input type='submit' value='Upload'>"
+		"</form>"
+		"<div id='prg'>progress: 0%</div>"
+		"<script>"
+		"$('form').submit(function(e){"
+		    "e.preventDefault();"
+		      "var form = $('#upload_form')[0];"
+		      "var data = new FormData(form);"
+		      " $.ajax({"
+		            "url: '/update',"
+		            "type: 'POST',"
+		            "data: data,"
+		            "contentType: false,"
+		            "processData:false,"
+		            "xhr: function() {"
+		                "var xhr = new window.XMLHttpRequest();"
+		                "xhr.upload.addEventListener('progress', function(evt) {"
+		                    "if (evt.lengthComputable) {"
+		                        "var per = evt.loaded / evt.total;"
+		                        "$('#prg').html('progress: ' + Math.round(per*100) + '%');"
+		                    "}"
+		               "}, false);"
+		               "return xhr;"
+		            "},"
+		            "success:function(d, s) {"
+		                "console.log('success!')"
+		           "},"
+		            "error: function (a, b, c) {"
+		            "}"
+		          "});"
+		"});"
+		"</script>";
+/*const static char http_index_html_1[] =
+	"<!DOCTYPE HTML><html>"
+	"<head><title>Congrats!</title></head>"
+		"<style>
+		  .button {
+		    padding: 15px 50px;
+		    font-size: 24px;
+		    text-align: center;
+		    outline: none;
+		    color: #fff;
+		    background-color: #0f8b8d;
+		    border: none;
+		    border-radius: 5px;
+		    -webkit-touch-callout: none;
+		    -webkit-user-select: none;
+		    -khtml-user-select: none;
+		    -moz-user-select: none;
+		    -ms-user-select: none;
+		    user-select: none;
+		    -webkit-tap-highlight-color: rgba(0,0,0,0);
+		   }
+		   .button:active {
+		     background-color: #0f8b8d;
+		     box-shadow: 2 2px #CDCDCD;
+		     transform: translateY(2px);
+		   }
+		   .state {
+		     font-size: 1.5rem;
+		     color:#8c8c8c;
+		     font-weight: bold;
+		   }
+		  </style>
+		  "<body><h1>1778 LOG PAGE</h1>"
+	"<p>This is a small test page, served by httpd of lwip.</p>"
+	"<p>: </p>";
+*/
+const static char http_index_html_2[] = "</body></html>";
+
+char http_index_html[1024];
+
+/* Dynamic header generation based on Filename */
+extern int GetHTTP_Header(const char *fName, char *buff);
+void http_server_netconn_init(void);
+
+#ifndef CRLF
+#define CRLF "\r\n"
+#endif
+
+typedef enum {
+    FWUPDATE_STATE_HEADER,
+    FWUPDATE_STATE_OCTET_START,
+    FWUPDATE_STATE_OCTET_STREAM,
+
+} fwupdate_state_t;
+
+typedef struct {
+
+    fwupdate_state_t state;
+
+    int content_length;
+    int file_length;
+    int accum_length;
+
+    /* Data stream accumulation buffer to meet 8-byte size-alignment constraint with v1.3.0 .sfb file update */
+    uint8_t accum_buf[8];
+    uint8_t accum_buf_len;
+
+} fwupdate_t;
+
+static fwupdate_t fwupdate;
+
+/**
+   * @brief  Secure Engine Error definition
+   */
+typedef enum
+{
+    SE_ERROR = 0U,
+    SE_SUCCESS = !SE_ERROR
+} SE_ErrorStatus;
+
+
+/**
+  *  @brief  Secure Engine Status definition
+  */
+typedef enum
+{
+    SE_OK = 0U,                                        /*!< Secure Engine OK */
+    SE_KO,                                             /*!< Secure Engine KO */
+    SE_INIT_ERR,                                       /*!< Secure Engine initialization error */
+    SE_BOOT_INFO_ERR,                                  /*!< An error occurred when accessing BootInfo area */
+    SE_BOOT_INFO_ERR_FACTORY_RESET,                    /*!< A factory reset has been executed to recover the BootInfo Initialization failure */
+    SE_SIGNATURE_ERR,                                  /*!< An error occurred when checking FW signature (Tag) */
+    SE_ERR_FLASH_READ                                  /*!< An error occurred trying to read the Flash */
+} SE_StatusTypeDef;
+
+/*! Set the delay type to COMMAND to specify rebooting upon command.
+ *  The application is responsible for marking the update as "ready to install".
+*/
+#define SE_PATCH_RebootDelay_COMMAND         ((uint32_t)0xFFFF)
+
+/*! Set the delay type to IMMEDIATE to specify rebooting and installing immediately.
+*/
+#define SE_PATCH_RebootDelay_IMMEDIATE       ((uint32_t)0)
+
+/*! Set the delay type to NEXT to specify installation on next reboot.
+ * The user application is still responsible for initiating the reboot.
+*/
+#define SE_PATCH_RebootDelay_NEXT            ((uint32_t)1)
+
+/*!
+* @value(StatusCode_NONE) No status code
+* @value(StatusCode_COMPLETED) Response to a completed API call or the update has completed in case of status poll
+* @value(StatusCode_INVALID_ARG) Response to an invalid API argument
+* @value(StatusCode_INVALID_IMAGE) Reponse to early header verification failure
+* @value(StatusCode_IMAGE_TOO_LARGE) Fail if provided length is too large, or embedded image length is too large
+* @value(StatusCode_IMAGE_TOO_SMALL) Fail if embedded image length is smaller than the minimum data length
+* @value(StatusCode_SECTION_NOT_AVAILABLE) Non-volatile section corresponding to the supplied ImageType cannot be found
+* @value(StatusCode_SECTION_ERASE_FAILURE) Error preparing (erasing) update target section
+* @value(StatusCode_SECTION_WRITE_FAILURE) Error writing data to update target section
+* @value(StatusCode_IMAGE_VERSION_FAILURE) Image version embedded in header is less than version of currently running image and update rejected
+* @value(StatusCode_INVALID_SECTION_KEY) The supplied firmware update image has a different section key than what is associated with the application currently running on the device
+* @value(StatusCode_IMAGE_VERIFY_FAILURE) Response after the completely written firmware image verification has failed
+* @value(StatusCode_INVALID_STATE) Response to an API called in an invalid state, e.g. supplying more data when waiting for reboot
+* @value(StatusCode_INVALID_ORDER) Supplied data with incorrect order for the current state
+* @value(StatusCode_TOO_FEW_BYTES) Supplied first data packet with less than minimum required bytes
+* @value(StatusCode_PARSER_ERROR) Update container format parser has encountered an unrecoverable error in the byte stream
+* @value(StatusCode_DECRYPTION_ERROR) Update container format stream decryption has failed
+* @value(StatusCode_INSTALL_ERROR) Error finalizing the newly written firmware in download slot (automatically or through SE_PATCH_InstallAtNextReset)
+* @value(StatusCode_FLASH_ERROR) Flash (possibly external) initialization error
+* @value(StatusCode_FLASH_SEGMENT_ERROR) Error initializing the SEGMENT read layer for external flash MultiSegment feature
+* @value(StatusCode_FLASH_CIPHER_ERROR) Error initializing the CIPHER write layer for external flash MultiSegment feature
+*/
+typedef enum
+{
+    SE_PATCH_StatusCode_NONE,
+    SE_PATCH_StatusCode_COMPLETED,
+    SE_PATCH_StatusCode_INVALID_ARG,
+    SE_PATCH_StatusCode_INVALID_PATCH_IMAGE,
+    SE_PATCH_StatusCode_INVALID_SOURCE_IMAGE,
+    SE_PATCH_StatusCode_INVALID_TARGET_IMAGE,
+    SE_PATCH_StatusCode_INVALID_PATCH_TAG,
+    SE_PATCH_StatusCode_IMAGE_TOO_LARGE,
+    SE_PATCH_StatusCode_IMAGE_TOO_SMALL,
+    SE_PATCH_StatusCode_SECTION_NOT_AVAILABLE,
+    SE_PATCH_StatusCode_SECTION_ERASE_FAILURE,
+    SE_PATCH_StatusCode_SECTION_WRITE_FAILURE,
+    SE_PATCH_StatusCode_IMAGE_VERSION_FAILURE,
+    SE_PATCH_StatusCode_INVALID_SECTION_KEY,
+    SE_PATCH_StatusCode_IMAGE_VERIFY_TAG_FAILURE,
+    SE_PATCH_StatusCode_IMAGE_VERIFY_ALG_FAILURE,
+    SE_PATCH_StatusCode_IMAGE_DECRYPT_FAILURE,
+    SE_PATCH_StatusCode_INVALID_STATE,
+    SE_PATCH_StatusCode_INVALID_ORDER,
+    SE_PATCH_StatusCode_TOO_FEW_BYTES,
+    SE_PATCH_StatusCode_PARSER_ERROR,
+    SE_PATCH_StatusCode_DECRYPTION_ERROR,
+    SE_PATCH_StatusCode_INSTALL_ERROR,
+    SE_PATCH_StatusCode_FLASH_ERROR,
+    SE_PATCH_StatusCode_FLASH_SEGMENT_ERROR,
+    SE_PATCH_StatusCode_FLASH_CIPHER_ERROR,
+    SE_PATCH_StatusCode__MAX__
+}  SE_PATCH_StatusCode;
+
+
+/*!
+ * High-level patching engine image types.
+ *
+ * These are the types of firmware images that may be presented to the patching engine.
+ */
+typedef enum
+{
+    SE_PATCH_ImageType_NONE = 0,
+    SE_PATCH_ImageType_APP
+}  SE_PATCH_ImageType;
+
+/*!
+* Update start setup data structure.
+*
+* @field(type) Target update location of firmware image presented to patching engine.
+*              This field may be set if known, or may be omitted (set to NONE) to use the firmware update image's
+*              embedded type determined on-the-fly.
+* @field(rebootDelay) Specify the reboot delay that is to occur after a completed firmware update.
+*                     @p(blist)
+*                     - RebootDelay_IMMEDIATE  reboot immediately upon successful written image verification.
+*                     - 1 to 0xFFFE random delay, in seconds, selected from within this window before rebooting as if RebootDelay_IMMEDIATE was selected.
+*                     - RebootDelay_COMMAND wait indefinately upon successful written image verification.
+*                       The user is responsible for rebooting the system, e.g. by calling {@link fm.driver.System#reset}.
+*                     @p
+* @field(totalLength) Provide if the image length is known - only used to initially reject an update if it is too large
+*                     for the device before examining the actual header. Set to 0 to ignore this first check and use the
+*                     embedded image header length in a subsequent {@link #data} call.  The type must also be specified
+*                     (not ImageType_NONE) to be able to validate this length parameter.
+*/
+typedef struct
+{
+    SE_PATCH_ImageType type;
+    uint16_t rebootDelay;
+    uint32_t totalLength;
+}  SE_PATCH_StartInfo;
+
+/*!
+* Status reporting enumeration indicating the current stage of
+* the update process.
+*
+* @value(Stage_IDLE) Updater is idle and awaiting a start command.
+* @value(Stage_UPDATE) Updater is actively processing data commands.
+* @value(Stage_VERIFIED) Updater has finished update and written a valid image
+*                        to non-volatile storage that is ready to be run on the
+*                        next reboot.
+*/
+typedef enum
+{
+    SE_PATCH_Stage_IDLE,
+    SE_PATCH_Stage_UPDATE,
+    SE_PATCH_Stage_VERIFIED
+}  SE_PATCH_Stage;
+
+/*!
+* Command response structure.
+*
+* There are different semantics to the completed flag depending on how it
+* is obtained (as API result or through {@link #poll}).
+*
+* If this status is polled for at any time after an update has successfully completed
+* but the system has not yet restarted, the `completed` flag is set, the `accumBytes` records
+* the total bytes recorded in the image, and the `stage` will be VERIFIED.
+*
+* If this status is obtained as an output from an API call, the `completed` flag is set to
+* indicate the API call completed.
+*
+* The accumBytes and totalBytes fields are useful as a progress indicator where
+* percentage could be calculated as (accumBytes * 100) / totalBytes.
+*
+* @field(completed) Set to indicate completion of the specified operation.
+* @field(error) Set if an error has occured.  An error will result in the stage set to IDLE.
+* @field(code) Current status code.
+* @field(stage) Set to the updater's current stage at time of generation of this message.
+* @field(accumBytes) Records the number of patch bytes received (excluding metadata).
+* @field(totalBytes) Records the total number of patch bytes expected (excluding metadata).
+*/
+typedef struct
+{
+    bool completed;
+    bool error;
+    SE_PATCH_StatusCode code;
+    SE_PATCH_Stage stage;
+    uint32_t accumBytes;
+    uint32_t totalBytes;
+} SE_PATCH_Status;
+
+#define CONTENT_LENGTH_TAG      "Content-Length:"
+#define OCTET_STREAM_TAG      "application/octet-stream\r\n\r\n"
+#define EMPTY_LINE_TAG          "\r\n\r\n"
+
+#define FWUPDATE_STATUS_ERROR          -1
+#define FWUPDATE_STATUS_NONE            0
+#define FWUPDATE_STATUS_INPROGRESS      1
+#define FWUPDATE_STATUS_DONE            2
+
+#if 1
+static const char* SE_PATCH_StatusCodeStrings[] = {
+    "None",
+    "Completed",
+    "Invalid arg - one or more invalid arguments supplied to API",
+    "Invalid image - firmware image header checksum failed or not present",
+    "Invalid source image",
+    "Invalid target image",
+    "Invalid patch tag",
+    "Image too large - firmware image too large to fit into section",
+    "Image too small - firmware image size invalid",
+    "Section not available - specified section is not available",
+    "Section erase failure - flash driver returned erase error",
+    "Section write failure - flash driver returned write error",
+    "Image version failure - firmware image version is not newer than current",
+    "Invalid section key - section partitions may have changed",
+    "Image verify tag failure - written image header checksum failed",
+    "Image verify alg failure - written image checksum failed",
+    "Image decrypt failure - cannot initialize decryption engine",
+    "Invalid state - update engine in wrong state for action",
+    "Invalid order - data received before firmware image header",
+    "Too few bytes - not enough bytes received to process header",
+    "Parser error - error in parsing .fmu firmware update image container format",
+    "Decryption error - error running decryption engine",
+    "Install error - error writing the final image valid tag bytes",
+    "Flash error - could not initialize low level flash",
+    "Flash segment error - could not setup the flash segment read layer",
+    "Flash cipher error - could not setup the flash cipher write layer",
+};
+
+#endif
+
+/* Function to check if the requested method is supported */
+static int supported_method(const char *method)
+{
+	if (strncmp(method, "GET", 3) == 0)
+		return 1;
+	if (strncmp(method, "POST", 4) == 0)
+		return 1;
+	return 0;
+}
+
+/* Function to extract version information from URI */
+static uint32_t get_version(const char *vstr)
+{
+	int major = 0, minor = 0;
+	sscanf(vstr, "HTTP/%d.%d", &major, &minor);
+	return (major << 16) | minor;
+}
+
+static const char* fwupdate_state_str(fwupdate_state_t state)
+{
+    switch (state) {
+    case FWUPDATE_STATE_HEADER: return "HEADER";
+    case FWUPDATE_STATE_OCTET_START: return "OCTET_START";
+    case FWUPDATE_STATE_OCTET_STREAM: return "OCTET_STREAM";
+    default:
+        return "<unknown>";
+    }
+}
+
+static void fwupdate_send_success(struct netconn* conn, const char* str)
+{
+//    netconn_write(conn, (const unsigned char*)fwupdate_success_html, (size_t)sizeof(fwupdate_success_html), NETCONN_NOCOPY);
+    netconn_write(conn, (const unsigned char*)str, (size_t)strlen(str), NETCONN_NOCOPY);
+}
+
+static int fwupdate_multipart_state_machine(struct netconn *conn, char *buf, u16_t buflen) {
+	/* So how the multipart file upload appears to work (from Chrome):
+	 *  1. Get the POST header in one netconn_recv() buffer.
+	 *  2. From header get the content-length which will be the number of
+	 *     bytes in following netconn_recv() buffer(s).
+	 *  3. Compute number of file bytes by subtracting content of second netconn_recv()  buffer
+	 *     up to the "Content-Type: application/octet-stream\r\n\r\n"
+	 *  4. Continue to process netconn_recv()  buffers until file bytes are received.
+	 *  5. Send "200 OK" response and close connection.
+	 */
+
+	/* Process the buffer as long as we can in one of these two scenarios only:
+	 In case of Chrome, multipart octet-stream comes in separate packet/buffer while
+	 in case of Postman, multipart octet-stream comes in same packet/buffer as POST header.
+	 */
+
+	return 0;
+	int ret = FWUPDATE_STATUS_NONE;
+
+	char *buf_start = buf;
+	char *buf_end = buf + buflen; /* points to byte AFTER end of buffer! */
+
+	/* Diagnostics */
+	//print_buf((uint8_t*)buf, buflen);
+	/* We advance the buffer pointer as parts are consumed.  Keep processing
+	 until buffer pointer gets nulled either as a result of not finding what we want
+	 or explicitly on error condition.
+	 */
+	while (buf && buf < buf_end) {
+
+		DEBUGOUT("@ fwupdate buf_start=%p, buf=%p buf_end=%p state=%s\n",
+				buf_start, buf, buf_end, fwupdate_state_str(fwupdate.state));
+
+		switch (fwupdate.state) {
+		case FWUPDATE_STATE_HEADER:
+			/* Look for POST header */
+			if ((buflen >= 12) && (strncmp(buf, "POST /update", 12) == 0)) {
+				ret = FWUPDATE_STATUS_ERROR; /* Error until we go to in progress */
+				/* This buffer must have the complete POST header */
+				DEBUGOUT("@ fwupdate -     Scanning HEADER\n");
+				/* Diagnostics */
+//				print_buf((uint8_t*) buf, buflen);
+				buf = strstr(buf, CONTENT_LENGTH_TAG);
+				if (buf) {
+					buf += strlen(CONTENT_LENGTH_TAG);
+					fwupdate.content_length = atoi(buf);
+					/* sanity check  */
+					if (fwupdate.content_length > 0) {
+						/* Having obtained content length, need to next find the
+						 end of the header, denoted by an empty line.
+						 This is where the content-length starts from. */
+						buf = strstr(buf, EMPTY_LINE_TAG);
+						if (buf) {
+							buf += strlen(EMPTY_LINE_TAG);
+							/* To get the length of the file, have to subtract all bytes up to and including
+							 application/octet-stream\r\n\r\n"
+							 */
+							/* advance the buffer reference point to here */
+							buf_start = buf;
+							/* Got what we need/expect and must wait for the "octet-stream" content-type in
+							 the next multipart header packet. */
+							fwupdate.state = FWUPDATE_STATE_OCTET_START;
+							ret = FWUPDATE_STATUS_INPROGRESS;
+
+							DEBUGOUT("@ fwupdate - Have content len=%d\n", fwupdate.content_length);
+						}
+					} else {
+						buf = 0;
+					}
+				}
+			} else {
+				buf = 0;
+			}
+			break;
+		case FWUPDATE_STATE_OCTET_START:
+			DEBUGOUT("FWUPDATE_STATE_OCTET_START\n");
+			ret = FWUPDATE_STATUS_ERROR;
+			fwupdate.state = FWUPDATE_STATE_HEADER;
+
+			/* Look for the start of the firmware update file */
+			buf = strstr(buf, OCTET_STREAM_TAG);
+			if (buf) {
+				buf += strlen(OCTET_STREAM_TAG);
+				int multipart_length = buf - buf_start;
+				/* Strictly speaking this computed file length is incorrect - it is a bit too large as it includes
+				 the ending multipart boundary tag of few dozen chars. This doesn't impact the update process because the
+				 patching engine manages byte counters internally. This is just for diagnostic purposes and sanity check.
+				 */
+				fwupdate.file_length = fwupdate.content_length
+						- multipart_length;
+				DEBUGOUT("@ fwupdate content len=%d multipart len=%d file len=%d\n",
+						fwupdate.content_length, multipart_length,
+						fwupdate.file_length);
+#if 1
+				/* Now can init the update */
+				SE_PATCH_StartInfo info = { .type = SE_PATCH_ImageType_APP, /* App type */
+				.rebootDelay = SE_PATCH_RebootDelay_NEXT, /* Allow us to to control when to reboot so we can send out a confirmation response to the web client. */
+				//.rebootDelay = SE_PATCH_RebootDelay_IMMEDIATE, /* Patch engine automatically reboots when update is complete (cannot send a response to web client) */
+						.totalLength = fwupdate.file_length, /* Could be a patch or full image; either way used as a sanity check but not necessary to use here. */
+				};
+				SE_PATCH_Status se_patch_status;
+//				SE_PATCH_InitStatus(&se_patch_status);
+//				SE_ErrorStatus se_status = SE_PATCH_Init(&se_patch_status, &info);
+//				printf("@ fwupdate INIT %d\n", se_status);
+//				fwupdate_PrintStatus(&se_patch_status);
+//				if (se_status == SE_SUCCESS)
+				{
+					/* Now need to consume rest of buffer as the file */
+					fwupdate.state = FWUPDATE_STATE_OCTET_STREAM;
+					fwupdate.accum_length = 0;
+					fwupdate.accum_buf_len = 0;
+					ret = FWUPDATE_STATUS_INPROGRESS;
+//				} else {
+//					fwupdate_send_err(conn, fwupdate_GetStatusCodeString(se_patch_status.code));
+				}
+#endif
+			}
+
+			break;
+
+		case FWUPDATE_STATE_OCTET_STREAM: {
+			DEBUGOUT("FWUPDATE_STATE_OCTET_STREAM\n");
+			/* All of "buf" until "buf_end"-1 is considered file data at this point */
+			/* It is safe to feed this buffer right into the patching engine.
+			 It could block here while flash is being erased & written if we have enough and correct bytes */
+
+			/* stm32-secure-patching-bootloader v1.3.0 errata:
+			 [2] SE_PATCH_Data API will fail if presented with a full-image update file (.sfb) data buffer length
+			 that is not a multiple of the platform's flash write size: typically 8 bytes (doubleword).
+			 Workaround is to ensure that the API is called with an 8-byte-multiple length buffer.
+			 Note: this is not necessary for .sfbp (patch) files, but having it in place won't affect .sfbp updates.
+			 For ethernet we have no control over how many bytes may be sent so we implement a buffer
+			 scheme to accumulate bytes until we meet the criteria for each SE_PATCH_Data() call.
+			 */
+
+			/* total bytes we have in this current buffer - these all have to be processed with SE_PATCH_Data()
+			 or stored in the accum_buf */
+			int len = buf_end - buf;
+			DEBUGOUT("@ fwupdate len=%d\n", len);
+
+			const uint8_t *input_buf; /* pointer to data we will consume */
+			int input_buf_len = 0; /* number of bytes to consume from this input buffer pointer */
+			int offset = 0; /* offset into the original buffer */
+
+			ret = FWUPDATE_STATUS_INPROGRESS;
+
+#if 0
+			SE_PATCH_Status se_patch_status;
+			SE_PATCH_InitStatus(&se_patch_status);
+#endif
+
+			/* One way or another we MUST consume all bytes in the received packet (buf).
+			 * Bytes that aren't a multiple of the accumulation buffer size are stored
+			 * in the accumulation buffer until next packet.
+			 */
+			while (len > 0) {
+				/* ----------------------------------------------------------------- */
+				input_buf = 0;
+
+				if (fwupdate.accum_buf_len > 0
+						|| len < sizeof(fwupdate.accum_buf)) {
+					/* We have existing bytes in the buffer or and /or too few bytes to process.
+					 Store them in our internal buffer.
+					 */
+					int avail = sizeof(fwupdate.accum_buf)
+							- fwupdate.accum_buf_len;
+					int copy = len > avail ? avail : len;
+					memcpy(fwupdate.accum_buf + fwupdate.accum_buf_len,
+							buf + offset, copy);
+					fwupdate.accum_buf_len += copy;
+
+					/* consumed these bytes into the front end buffer */
+					len -= copy;
+					offset += copy;
+
+					DEBUGOUT("@   accum %d bytes\n", copy);
+				}
+
+				/* If the front end buffer is full, use it */
+				if (fwupdate.accum_buf_len == sizeof(fwupdate.accum_buf)) {
+					DEBUGOUT("@   use accum_buf\n");
+					/* We now have all required minimum bytes in the front end buffer.Process them */
+					input_buf = fwupdate.accum_buf;
+					fwupdate.accum_buf_len = 0;
+					input_buf_len = sizeof(fwupdate.accum_buf);
+				}
+				// otherwise use a block directly from original buffer if available
+				else if (len >= sizeof(fwupdate.accum_buf)) {
+					// No waiting bytes and we have enough to process another block(s)
+					input_buf = (const uint8_t*) buf + offset;
+					DEBUGOUT("@   use buf at %d\n", offset);
+
+					/* We will try to consume all bytes that are a multiple of the accumulation buffer.
+					 The rest will get consumed into the accumulation buffer and held for the next packet received.
+					 */
+					input_buf_len = (len / sizeof(fwupdate.accum_buf))
+							* sizeof(fwupdate.accum_buf);
+					len -= input_buf_len;
+					offset += input_buf_len;
+				}
+				/* ----------------------------------------------------------------- */
+
+				/* Only if there is at least one accum_buf number of bytes available */
+				if (input_buf) {
+					//print_hex_buf((const uint8_t*)input_buf, input_buf_len);
+					DEBUGOUT("@ fwupdate DATA len=%d status=%d\n", input_buf_len, 0);
+#if 1
+//					SE_PATCH_InitStatus(&se_patch_status);
+//					SE_ErrorStatus se_status = SE_PATCH_Data(&se_patch_status, input_buf, input_buf_len);
+//					printf("@ fwupdate DATA len=%d status=%d\n", input_buf_len, se_status);
+//					fwupdate_PrintStatus(&se_patch_status);
+//					if (se_status == SE_ERROR)
+					{
+//						fwupdate_send_err(conn, fwupdate_GetStatusCodeString(se_patch_status.code));
+/*						ret = FWUPDATE_STATUS_ERROR;
+						fwupdate.state = FWUPDATE_STATE_HEADER;
+					} else {*/
+						fwupdate.accum_length += len;
+					}
+#endif
+				}
+			}
+
+			/* In any case we have consumed all bytes remaining in this buffer */
+			buf = 0;
+
+			if (ret == FWUPDATE_STATUS_INPROGRESS) {
+#if 1
+				if (fwupdate.accum_length >= fwupdate.file_length) {
+//						|| se_patch_status.stage == SE_PATCH_Stage_VERIFIED) {
+					/* now the thing is, if rebootdelay_IMMEDIATE was selected, the device will have rebooted
+					 before we get here.
+					 */
+//					if (se_patch_status.stage == SE_PATCH_Stage_VERIFIED) {
+						fwupdate_send_success(conn,
+								"<html><head><meta http-equiv=\"refresh\" content=\"15; url='/firmwareupdate.html'\" /></head>"
+										"<body>Firmware upload success! Rebooting and applying update in 5 seconds. Auto reload in 15.</body></html>");
+						ret = FWUPDATE_STATUS_DONE;
+/*					} else {
+						fwupdate_send_err(conn,
+								"Firmware upload failed for unknown reason! Maybe too small file or file truncated.\n");
+						ret = FWUPDATE_STATUS_ERROR;
+					}
+*/
+					/* if we have all file bytes, we are done whether it worked or not */
+					fwupdate.state = FWUPDATE_STATE_HEADER;
+				}
+#endif
+			}
+
+			break;
+		}
+		}
+	} /* while (buf) */
+
+	return ret;
+}
+
+/** Serve one HTTP connection accepted in the http thread */
+static void http_server_netconn_serve(struct netconn *conn) {
+	struct netbuf *inbuf;
+	char *buf, *tbuf;
+	u16_t buflen;
+	struct fs_file *fs = NULL;
+	err_t err;
+	static uint8_t file_buffer[1024];
+	int len;
+	uint32_t req_ver;
+
+	/* Read the data from the port, blocking if nothing yet there.
+	 We assume the request (the part we care about) is in one netbuf */
+	while ((err = netconn_recv(conn, &inbuf)) == ERR_OK) {
+//		err = netconn_recv(conn, &inbuf);
+
+		if (err != ERR_OK)
+			return;
+
+		do {
+			netbuf_data(inbuf, (void**) &buf, &buflen);
+
+			/*	// отсекаем GSM пакеты
+			 if (buflen > 8 && strstr(buf, "netping:")) {
+			 if (buflen < sizeof(v1778_data)-2) {
+			 memcpy(v1778_data, buf, buflen);
+			 v1778_len = buflen;
+			 }
+			 }
+			 */
+
+			if (buflen < 5 || strstr(buf, CRLF) == NULL) {
+				//LWIP_DEBUGF(HTTPD_DEBUG,
+				DEBUGOUT("HTTPD: Invalid Request Line\r\n");
+				goto close_and_exit;
+			}
+
+			LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE, ("HTTPD: Got URI %s\r\n", buf));
+
+			tbuf = strchr(buf, ' ');
+			if (tbuf == NULL) {
+				//LWIP_DEBUGF(HTTPD_DEBUG,
+				DEBUGOUT("HTTPD: Parse error in Request Line\r\n");
+				goto close_and_exit;
+			}
+
+			//*tbuf++ = 0;
+			/*if (!supported_method(buf)) {
+				//LWIP_DEBUGF(HTTPD_DEBUG,
+				DEBUGOUT("HTTPD: Un-supported method: %s\r\n", buf);
+				goto close_and_exit;
+			}*/
+
+			if (strncmp(buf, "GET", 3) == 0) {
+				buf = tbuf;
+				tbuf = strchr(buf, ' ');
+				if (tbuf == NULL) {
+					//LWIP_DEBUGF(HTTPD_DEBUG,
+					DEBUGOUT("HTTPD: Version string not found: %s\r\n", buf);
+				} else {
+					*tbuf++ = 0;
+					req_ver = get_version(tbuf);
+					//LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE,
+					DEBUGOUT("HTTPD: Request version %d.%d\r\n",
+									req_ver >> 16, req_ver & 0xFFFF);
+				}
+
+				tbuf = strchr(buf, '?');
+				if (tbuf != NULL) {
+					//LWIP_DEBUGF(HTTPD_DEBUG,
+					DEBUGOUT("HTTPD: Arguements %s in URI ignored\r\n", tbuf);
+					*tbuf++ = 0;
+				}
+
+				//if (strlen(buf) == 1 && *buf == '/') {
+					fs = fs_open("/index.htm");
+					if (fs == NULL)
+						fs = fs_open("/index.html");
+					if (fs == NULL) {
+						/* No home page, send if from buffer */
+						netconn_write(conn, http_html_hdr, sizeof(http_html_hdr) - 1,
+								NETCONN_NOCOPY);
+						snprintf(http_index_html, 1024, "%s %s %s", http_index_html_1,
+								v1778_log, http_index_html_2);
+						netconn_write(conn, http_index_html, strlen(http_index_html) - 1,
+								NETCONN_NOCOPY);
+						//netconn_write(conn, http_index_html, sizeof(http_index_html)-1, NETCONN_NOCOPY);
+						goto close_and_exit;
+					}
+				/*} else {
+					fs = fs_open(buf);
+				}
+
+				if (fs == NULL) {
+					int len;
+					//LWIP_DEBUGF(HTTPD_DEBUG,
+					DEBUGOUT("HTTPD: Unable to open file[%s]\r\n", buf);
+					len = GetHTTP_Header(NULL, (char*) file_buffer);
+					netconn_write(conn, file_buffer, len, NETCONN_NOCOPY);
+					goto close_and_exit;
+				}*/
+
+				/***
+				 * FIXME: There is a possible race condition while accessing
+				 *        file_buffer, must use a mutex to protect it.
+				 **/
+				if (fs->http_header_included)
+					/* Send the header */
+					netconn_write(conn, fs->data, fs->index, NETCONN_NOCOPY);
+
+				/* Read the file now */
+				while ((len = fs_read(fs, (char*) file_buffer, sizeof(file_buffer))) > 0) {
+					netconn_write(conn, file_buffer, len, NETCONN_NOCOPY);
+				}
+			}
+			else {
+				/* Not a handled GET request - process this as a potential multipart form POST */
+				int ret = fwupdate_multipart_state_machine(conn, buf, buflen);
+				if (ret == FWUPDATE_STATUS_NONE) {
+					/* ignore */
+				} else if (ret == FWUPDATE_STATUS_INPROGRESS) {
+					/* Don't close the connection! */
+		//			close = false;
+				} else {
+					/* Some result, we should close the connection now. */
+		//			close = true;
+
+					if (ret == FWUPDATE_STATUS_DONE) {
+						/* reboot after we close the connection. */
+		//				reboot = true;
+					}
+				}
+			}
+		} while (netbuf_next(inbuf) >= 0);
+
+		netbuf_delete(inbuf);
+	}
+
+
+close_and_exit:
+	fs_close(fs);
+	/* Close the connection (server closes in HTTP) */
+	netconn_close(conn);
+
+	/* Delete the buffer (netconn_recv gives us ownership,
+	 so we have to make sure to deallocate the buffer) */
+//	netbuf_delete(inbuf);
+}
+
+/** The main function, never returns! */
+static void
+http_server_netconn_thread(void *arg)
+{
+  struct netconn *conn, *newconn;
+  err_t err;
+  LWIP_UNUSED_ARG(arg);
+  
+  /* Create a new TCP connection handle */
+  conn = netconn_new(NETCONN_TCP);
+  LWIP_ERROR("http_server: invalid conn", (conn != NULL), return;);
+  
+  /* Bind to port 80 (HTTP) with default IP address */
+  netconn_bind(conn, NULL, 80);
+  
+  /* Put the connection into LISTEN state */
+  netconn_listen(conn);
+  
+  do {
+    err = netconn_accept(conn, &newconn);
+    if (err == ERR_OK) {
+      http_server_netconn_serve(newconn);
+      netconn_delete(newconn);
+    }
+  } while(err == ERR_OK);
+  //LWIP_DEBUGF(HTTPD_DEBUG,
+  DEBUGOUT("http_server_netconn_thread: netconn_accept received error %d, shutting down",
+    err);
+  netconn_close(conn);
+  netconn_delete(conn);
+}
+
+/*********************************************************************//**
+ * @brief	Blinky Initialization function
+ *
+ * This function is called by the common dual-core init,
+ * which will start the HTTP server and will serve requests received.
+ *
+ * @return	None
+ **********************************************************************/
+void
+http_server_netconn_init(void)
+{
+  sys_thread_new("http_server_netconn", http_server_netconn_thread, NULL, DEFAULT_THREAD_STACKSIZE + 128, DEFAULT_THREAD_PRIO);
+}
+
+#endif /* LWIP_NETCONN*/

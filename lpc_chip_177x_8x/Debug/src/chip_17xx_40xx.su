@@ -1,0 +1,3 @@
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_chip_177x_8x/inc/clock_17xx_40xx.h:111:24:Chip_Clock_GetPLLStatus	16	static
+../src/chip_17xx_40xx.c:55:6:SystemCoreClockUpdate	8	static
+../src/chip_17xx_40xx.c:64:6:Chip_USB_Init	8	static

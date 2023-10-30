@@ -1,0 +1,3 @@
+../example/src/board_sysinit.c:88:6:Board_SetupMuxing	8	static
+../example/src/board_sysinit.c:94:6:Board_SetupClocking	8	static
+../example/src/board_sysinit.c:103:6:Board_SystemInit	8	static

@@ -1,0 +1,13 @@
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_chip_177x_8x/inc/clock_17xx_40xx.h:366:24:Chip_Clock_GetEMCClockDiv	4	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_chip_177x_8x/inc/clock_17xx_40xx.h:828:24:Chip_Clock_GetEMCClockRate	16	static
+../src/emc_17xx_40xx.c:63:17:convertTimmingParam	32	static
+../src/emc_17xx_40xx.c:85:17:getColsLen	24	static
+../src/emc_17xx_40xx.c:104:6:initDynMem	56	static
+../src/emc_17xx_40xx.c:191:6:initStaticMem	32	static
+../src/emc_17xx_40xx.c:208:6:Chip_EMC_Dynamic_Init	24	static
+../src/emc_17xx_40xx.c:219:6:Chip_EMC_Dynamic_Enable	16	static
+../src/emc_17xx_40xx.c:230:6:Chip_EMC_Static_Init	24	static
+../src/emc_17xx_40xx.c:241:6:Chip_EMC_Mirror	16	static
+../src/emc_17xx_40xx.c:252:6:Chip_EMC_Enable	16	static
+../src/emc_17xx_40xx.c:263:6:Chip_EMC_LowPowerMode	16	static
+../src/emc_17xx_40xx.c:274:6:Chip_EMC_Init	24	static

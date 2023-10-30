@@ -1,0 +1,9 @@
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_chip_177x_8x/inc/clock_17xx_40xx.h:120:20:Chip_Clock_IsMainPLLEnabled	4	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_chip_177x_8x/inc/clock_17xx_40xx.h:146:20:Chip_Clock_IsMainPLLLocked	4	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_chip_177x_8x/inc/clock_17xx_40xx.h:192:20:Chip_Clock_EnableCrystal	4	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_chip_177x_8x/inc/clock_17xx_40xx.h:201:20:Chip_Clock_IsCrystalEnabled	4	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_chip_177x_8x/inc/clock_17xx_40xx.h:488:20:Chip_Clock_SetMainPLLSource	16	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_chip_177x_8x/inc/clock_17xx_40xx.h:588:20:Chip_Clock_SetPCLKDiv	16	static
+../src/sysinit_17xx_40xx.c:112:6:Chip_SetupIrcClocking	8	static
+../src/sysinit_17xx_40xx.c:139:6:Chip_SetupXtalClocking	8	static
+../src/sysinit_17xx_40xx.c:174:6:Chip_SystemInit	8	static

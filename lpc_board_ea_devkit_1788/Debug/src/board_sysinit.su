@@ -1,0 +1,6 @@
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_chip_177x_8x/inc/sysctl_17xx_40xx.h:284:20:Chip_SYSCTL_EnableBoost	4	static
+/home/ygy/eclipse-workspace/ADC_UDP_STREAM_LPC1778/lpc_chip_177x_8x/inc/clock_17xx_40xx.h:357:20:Chip_Clock_SetEMCClockDiv	16	static
+../src/board_sysinit.c:216:6:Board_SetupClocking	8	static
+../src/board_sysinit.c:230:6:Board_SetupMuxing	16	static
+../src/board_sysinit.c:252:6:Board_SetupExtMemory	8	static
+../src/board_sysinit.c:282:6:Board_SystemInit	8	static
