@@ -1,6 +1,5 @@
 # ADC_UDP_STREAM_LPC1778
-ADC to UDP tream. LPC178 based 
-
+ADC to UDP tream. LPC1788FBD144 based 
 
 used with https://github.com/gravl4/ADC_UDP_LOGGER
 generate ADC imitation 
