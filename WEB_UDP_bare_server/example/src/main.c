@@ -63,6 +63,12 @@
 //#define _100HZ
 //#define _10HZ
 
+#ifdef _20000HZ
+#define TICKRATE_HZ1 (20000)
+#endif
+#ifdef _10000HZ
+#define TICKRATE_HZ1 (10000)
+#endif
 #ifdef _1000HZ
 #define TICKRATE_HZ1 (1000)
 #endif
@@ -136,7 +142,7 @@ static double adcData[8] = {0};
 const double step[8] = {(4096.0 / (1000.0 / 100.0)), (4096.0 / (1000.0 / 10.0)), (4096.0 / (1000.0 / 1.0)),
 					(4096.0 / (1000.0 / 0.1)), (4096.0 / (1000.0 / 0.01)), 0.0, 0.0, 0.0};
 
-volatile uint16_t time_counter = 0;
+volatile uint32_t time_counter = 0;
 volatile uint16_t adc_data[8] = {0};
 volatile uint16_t dig_data = 0;
 volatile uint8_t freq_flag = 0;
@@ -144,13 +150,13 @@ void TIMER0_IRQHandler(void)
 {
 	if (Chip_TIMER_MatchPending(LPC_TIMER0, 1)) {
 		Chip_TIMER_ClearMatch(LPC_TIMER0, 1);
-		Board_LED_Toggle(0);
+		//Board_LED_Toggle(0);
 
 		freq_flag =1 ;
 	 	//struct AMessage xRxedStructure;
 	 	//xRxedStructure.ucMessageID = count++;
 	 	time_counter++;
-
+/*
 	 	for (int i = 0; i < 8; i++) {
 	 		adcData[i] = (double)adcData[i] + step[i];
 	 		if (adcData[i] > 4095)
@@ -165,7 +171,7 @@ void TIMER0_IRQHandler(void)
 	 		add = 0;
 	 	}
 	 	dig_data++;
-
+*/
 	 //	ring_buffer_queue_arr(&ring_buffer, &xRxedStructure, sizeof(struct AMessage));
 	}
 }
@@ -247,7 +253,7 @@ int main(void) {
 	Chip_TIMER_Init(LPC_TIMER0);
 
 	/* Timer rate is system clock rate */
-	timerFreq = Chip_Clock_GetSystemClockRate();
+	timerFreq = Chip_Clock_GetSystemClockRate()/2;
 
 	/* Timer setup for match and interrupt at TICKRATE_HZ */
 	Chip_TIMER_Reset(LPC_TIMER0);
@@ -290,6 +296,12 @@ int main(void) {
 
 	udp_command_init();
 
+#ifdef _20000HZ
+	total_cnt = 64 * 22;
+#endif
+#ifdef _10000HZ
+	total_cnt = 64 * 22;
+#endif
 #ifdef _1000HZ
 	total_cnt = 50 * 22;
 #endif
@@ -373,46 +385,58 @@ int main(void) {
 			}
 		}
 
+		static uint16_t freetime = 0;
+		freetime++;
 		//while (ring_buffer_dequeue_arr(&ring_buffer, &xTxedStructure, sizeof(struct AMessage)) == sizeof(struct AMessage)) {
-		while (freq_flag) {
-			freq_flag = 0;
-			unsigned char out_buffer[32];
-			out_buffer[0] = 0x55;
-			out_buffer[1] = 0x33;
-			out_buffer[2] = time_counter >> 8;
-			out_buffer[3] = time_counter;
-			for (int i = 0; i < 8; i++) {
-				out_buffer[4 + i * 2] = adc_data[i] >> 8;
-				out_buffer[4 + 1 + i * 2] = adc_data[i];
-			}
-/*
-			for (int i = 0; i < 2; i++) {
-				out_buffer[20 + i * 2] = xTxedStructure.digitalData[i]
-						>> 8;
-				out_buffer[20 + 1 + i * 2] =
-						xTxedStructure.digitalData[i];
-			}*/
-			out_buffer[20] = dig_data >> 8;
-			out_buffer[21] = dig_data & 0x00ff;
+	    while (freq_flag) {
+	      freq_flag = 0;
 
-			for (int i = 0; i < 22; i++) {
-				send_buffer[send_cnt++] = out_buffer[i];
-			}
+	      static uint16_t sample_id = 0;
+	      static uint32_t time_counter_prev = 0;
+#if 0
+	      char out_buffer[32];
+	      snprintf(out_buffer, 32, "n:%05i t:%03i f:%03i \r\n",sample_id, time_counter-time_counter_prev,freetime  );
+#else
+	      unsigned char out_buffer[32];
+	      out_buffer[0] = 0x55;
+	      out_buffer[1] = 0x33;
 
-			if (send_cnt >= total_cnt) {
-				struct pbuf *p;
-				//strcpy((char*) out_buffer, "hello!\r\n");
-				p = pbuf_alloc(PBUF_TRANSPORT, total_cnt, PBUF_RAM);
-				if (p != NULL) {
-					pbuf_take(p, (void*) send_buffer, total_cnt);
+	      out_buffer[2] = sample_id >> 8;
+	      out_buffer[3] = sample_id;
 
-					udp_sendto(upcb_data, p, &destIPAddr, 2001);
-					send_cnt = 0;
+	      static uint16_t analog =0;
+	      for (int i = 0; i < 8; i++) {
+	        out_buffer[4 + i * 2] = analog>>8;//adc_data[i] >> 8;
+	        out_buffer[4 + 1 + i * 2] = analog;//adc_data[i];
+	      }
+	      analog++;
+	      if (analog > 4095) analog = 0;
 
-					pbuf_free(p);
-				}
-			}
-		}
+	      out_buffer[20] = sample_id << 2;//dig_data >> 8;
+	      out_buffer[21] = (sample_id << 2)&0x00ff ;//dig_data & 0x00ff;
+#endif
+	      time_counter_prev = time_counter;
+	      sample_id++;
+	      freetime=0;
+	      for (int i = 0; i < 22; i++) {
+	        send_buffer[send_cnt++] = out_buffer[i];
+	      }
+
+	      if (send_cnt >= total_cnt) {
+	        struct pbuf *p;
+	        //strcpy((char*) out_buffer, "hello!\r\n");
+	        p = pbuf_alloc(PBUF_TRANSPORT, total_cnt, PBUF_RAM);
+	        if (p != NULL) {
+	          pbuf_take(p, (void*) send_buffer, total_cnt);
+
+	          udp_sendto(upcb_data, p, &destIPAddr, 2001);
+	          send_cnt = 0;
+
+	          pbuf_free(p);
+	        }
+	      }
+	    }
+
 	}
 
 	/* Should never arrive here */
